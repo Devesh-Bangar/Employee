@@ -50,16 +50,51 @@ Amazon CloudWatch → Logs & Monitoring
 - Filter attendance by date
 - Search employees by name or email
 
-## Prerequisites
+## 0. AWS Account & CLI Setup
 
-Before deploying, make sure you have:
+If you are starting from scratch, follow these steps to set up your AWS environment:
 
-1. **AWS Account** with appropriate permissions
-2. **AWS CLI** installed and configured
+### Step A: Create an AWS Account
+1. Go to [aws.amazon.com](https://aws.amazon.com/) and click **"Create an AWS Account"**.
+2. Follow the on-screen prompts to sign up (you will need an email, phone number, and a credit/debit card for identity verification).
+3. Once created, sign in to the **AWS Management Console** using your root email address.
+
+### Step B: Create an IAM User (For Deployment)
+It is best practice not to use your root account for deployments. We will create a dedicated IAM user:
+1. In the AWS Console search bar at the top, type **"IAM"** and click on the IAM service.
+2. In the left navigation pane, click **"Users"** -> **"Create user"**.
+3. **User name**: `sam-deploy-user` (or any name you like) -> Click **Next**.
+4. **Permissions**: Select **"Attach policies directly"**.
+5. Search for and check the box next to **`AdministratorAccess`** -> Click **Next** -> Click **Create user**.
+   *(Note: AdministratorAccess is easiest for initial setup, but in production, you should use least-privilege IAM policies).*
+
+### Step C: Generate Access Keys
+1. Still in IAM, click on the name of the user you just created (`sam-deploy-user`).
+2. Go to the **"Security credentials"** tab.
+3. Scroll down to **"Access keys"** and click **"Create access key"**.
+4. Select **"Command Line Interface (CLI)"** -> Check the confirmation box -> Click **Next** -> Click **Create access key**.
+5. **CRITICAL:** Copy the **Access Key ID** and **Secret Access Key**. *You will not be able to see the Secret Access Key again after closing this page!*
+
+### Step D: Configure AWS CLI Locally
+1. Ensure the AWS CLI is installed on your computer ([Download here](https://aws.amazon.com/cli/)).
+2. Open your terminal and run:
    ```bash
    aws configure
    ```
-3. **AWS SAM CLI** installed
+3. When prompted, enter the credentials you got in Step C:
+   - **AWS Access Key ID**: Paste your Access Key ID
+   - **AWS Secret Access Key**: Paste your Secret Access Key
+   - **Default region name**: `ap-south-1` (or your preferred region, e.g., `us-east-1`)
+   - **Default output format**: `json`
+
+You are now authenticated and ready to deploy!
+
+## 1. Prerequisites
+
+Before deploying the actual code, make sure you have:
+
+1. **AWS CLI** configured (completed in Step D above)
+2. **AWS SAM CLI** installed
    ```bash
    brew install aws-sam-cli    # macOS
    # or visit: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
