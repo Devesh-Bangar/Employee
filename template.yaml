@@ -1,0 +1,286 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Employee Attendance Management System — MVP
+
+# ---------------------------------------------------------------------------
+# Global settings
+# ---------------------------------------------------------------------------
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.13
+    MemorySize: 256
+    Environment:
+      Variables:
+        EMPLOYEES_TABLE: !Ref EmployeesTable
+        ATTENDANCE_TABLE: !Ref AttendanceTable
+
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowOrigin: "'*'"
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # -------------------------------------------------------------------------
+  # Cognito User Pool
+  # -------------------------------------------------------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: attendance-user-pool
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+        - Name: name
+          Required: true
+          Mutable: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: attendance-app-client
+      UserPoolId: !Ref UserPool
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      GenerateSecret: false
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: admin
+      UserPoolId: !Ref UserPool
+      Description: Admin users with full access
+
+  EmployeeGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: employee
+      UserPoolId: !Ref UserPool
+      Description: Regular employees
+
+  # -------------------------------------------------------------------------
+  # DynamoDB Tables
+  # -------------------------------------------------------------------------
+  EmployeesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Employees
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: employee_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: employee_id
+          KeyType: HASH
+
+  AttendanceTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Attendance
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: employee_id
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: employee_id
+          KeyType: HASH
+        - AttributeName: date
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: DateIndex
+          KeySchema:
+            - AttributeName: date
+              KeyType: HASH
+            - AttributeName: employee_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # -------------------------------------------------------------------------
+  # API Gateway
+  # -------------------------------------------------------------------------
+  AttendanceApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: attendance-api
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt UserPool.Arn
+        AddDefaultAuthorizerToCorsPreflight: false
+
+  # -------------------------------------------------------------------------
+  # Lambda Function
+  # -------------------------------------------------------------------------
+  AttendanceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: attendance-handler
+      CodeUri: backend/attendance/
+      Handler: app.lambda_handler
+      Description: Handles all attendance API routes
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EmployeesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AttendanceTable
+      Events:
+        CheckIn:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /attendance/check-in
+            Method: post
+        CheckOut:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /attendance/check-out
+            Method: post
+        AttendanceHistory:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /attendance/history
+            Method: get
+        AttendanceToday:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /attendance/today
+            Method: get
+        AttendanceAll:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /attendance/all
+            Method: get
+        Employees:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /employees
+            Method: get
+
+  # -------------------------------------------------------------------------
+  # S3 Bucket for Frontend
+  # -------------------------------------------------------------------------
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "attendance-frontend-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: login.html
+        ErrorDocument: login.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  # -------------------------------------------------------------------------
+  # Cognito Post-Confirmation Trigger (auto-create employee record)
+  # -------------------------------------------------------------------------
+  PostConfirmationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: attendance-post-confirmation
+      Runtime: python3.13
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 10
+      InlineCode: |
+        import boto3
+        import os
+        from datetime import datetime
+
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(os.environ.get("EMPLOYEES_TABLE", "Employees"))
+
+        def handler(event, context):
+            user_attrs = event["request"]["userAttributes"]
+            table.put_item(
+                Item={
+                    "employee_id": user_attrs["sub"],
+                    "name": user_attrs.get("name", ""),
+                    "email": user_attrs.get("email", ""),
+                    "role": "employee",
+                    "created_at": datetime.utcnow().isoformat() + "Z",
+                },
+                ConditionExpression="attribute_not_exists(employee_id)",
+            )
+            return event
+      Environment:
+        Variables:
+          EMPLOYEES_TABLE: !Ref EmployeesTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EmployeesTable
+
+  PostConfirmationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt PostConfirmationFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${AttendanceApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient
+
+  FrontendBucketName:
+    Description: S3 bucket name for frontend hosting
+    Value: !Ref FrontendBucket
+
+  FrontendWebsiteUrl:
+    Description: S3 website URL
+    Value: !GetAtt FrontendBucket.WebsiteURL

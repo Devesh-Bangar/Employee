@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — Attendance System</title>
+  <meta name="description" content="Admin dashboard for the Employee Attendance System. View all employees, track attendance, and manage workforce data." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="page-header fade-in">
+      <div>
+        <h1>🛡️ <span id="admin-name">Admin</span> Dashboard</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
+          Employee Attendance Overview
+        </p>
+      </div>
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <a href="employee.html" class="btn btn-outline btn-sm">
+          👤 My Attendance
+        </a>
+        <button id="btn-logout" class="btn btn-outline btn-sm">
+          ↗ Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Alert -->
+    <div id="alert-message" class="alert"></div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="card stat-card total scale-in">
+        <div class="stat-icon">👥</div>
+        <div class="card-title">Total Employees</div>
+        <div class="card-value" id="stat-total">--</div>
+      </div>
+      <div class="card stat-card present scale-in" style="animation-delay: 0.05s;">
+        <div class="stat-icon">✅</div>
+        <div class="card-title">Present Today</div>
+        <div class="card-value" id="stat-present">--</div>
+      </div>
+      <div class="card stat-card absent scale-in" style="animation-delay: 0.1s;">
+        <div class="stat-icon">❌</div>
+        <div class="card-title">Absent Today</div>
+        <div class="card-value" id="stat-absent">--</div>
+      </div>
+    </div>
+
+    <!-- Attendance Table -->
+    <div class="card scale-in" style="animation-delay: 0.15s;">
+      <h2 class="section-title">
+        <span class="icon">📋</span> Attendance Records
+      </h2>
+
+      <!-- Filters -->
+      <div class="filters-bar">
+        <input
+          type="date"
+          id="date-filter"
+          class="form-input"
+          title="Filter by date"
+        />
+        <input
+          type="text"
+          id="search-input"
+          class="form-input"
+          placeholder="🔍 Search by name or email..."
+        />
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Check In</th>
+              <th>Check Out</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="attendance-tbody">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 2rem;">
+                <span class="spinner"></span>
+                <p style="margin-top: 0.5rem; color: var(--text-muted);">Loading attendance...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty state -->
+      <div id="attendance-empty" class="empty-state" style="display: none;">
+        <div class="icon">📭</div>
+        <p>No attendance records found for this date.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cognito SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+
+  <!-- App Scripts -->
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/admin.js"></script>
+
+</body>
+</html>

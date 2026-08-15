@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Employee Dashboard — Attendance System</title>
+  <meta name="description" content="Employee dashboard for managing daily attendance. Check in, check out, and view your attendance history." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="page-header fade-in">
+      <div>
+        <h1>Welcome, <span id="employee-name">Employee</span></h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
+          Employee Dashboard
+        </p>
+      </div>
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <a href="admin.html" id="admin-link" class="btn btn-outline btn-sm" style="display: none;">
+          🛡️ Admin Panel
+        </a>
+        <button id="btn-logout" class="btn btn-outline btn-sm">
+          ↗ Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Alert -->
+    <div id="alert-message" class="alert"></div>
+
+    <!-- Today's Attendance Card -->
+    <div class="card scale-in" style="margin-bottom: 1.5rem;">
+      <h2 class="section-title">
+        <span class="icon">📋</span> Today's Attendance
+      </h2>
+
+      <div class="today-status">
+        <div class="status-item">
+          <div class="status-label">Check In</div>
+          <div id="check-in-time" class="status-time empty">--:--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Check Out</div>
+          <div id="check-out-time" class="status-time empty">--:--</div>
+        </div>
+      </div>
+
+      <div class="attendance-actions">
+        <button id="btn-check-in" class="btn btn-success btn-lg">
+          ✓ Check In
+        </button>
+        <button id="btn-check-out" class="btn btn-danger btn-lg" disabled>
+          ✗ Check Out
+        </button>
+      </div>
+    </div>
+
+    <!-- Attendance History -->
+    <div class="card scale-in" style="animation-delay: 0.1s;">
+      <h2 class="section-title">
+        <span class="icon">📊</span> Attendance History
+      </h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Check In</th>
+              <th>Check Out</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr>
+              <td colspan="4" style="text-align: center; padding: 2rem;">
+                <span class="spinner"></span>
+                <p style="margin-top: 0.5rem; color: var(--text-muted);">Loading history...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty state -->
+      <div id="history-empty" class="empty-state" style="display: none;">
+        <div class="icon">📭</div>
+        <p>No attendance records yet.</p>
+        <p style="font-size: 0.85rem; margin-top: 0.25rem;">Click "Check In" to start tracking.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cognito SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+
+  <!-- App Scripts -->
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/employee.js"></script>
+
+</body>
+</html>
