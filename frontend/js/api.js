@@ -66,3 +66,7 @@ async function apiGet(path) {
 async function apiPost(path, body = {}) {
   return apiRequest("POST", path, body);
 }
+
+async function apiDelete(path) {
+  return apiRequest("DELETE", path);
+}

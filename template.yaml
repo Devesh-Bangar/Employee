@@ -18,7 +18,7 @@ Globals:
 
   Api:
     Cors:
-      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowMethods: "'GET,POST,DELETE,OPTIONS'"
       AllowHeaders: "'Content-Type,Authorization'"
       AllowOrigin: "'*'"
 
@@ -200,6 +200,12 @@ Resources:
             RestApiId: !Ref AttendanceApi
             Path: /employees
             Method: post
+        DeleteEmployee:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /employees/{employee_id}
+            Method: delete
 
   # -------------------------------------------------------------------------
   # S3 Bucket for Frontend

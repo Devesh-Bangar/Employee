@@ -353,6 +353,57 @@ def handle_create_employee(event, user_info):
         "temp_password": temp_password,
     })
 
+def handle_delete_employee(event, user_info):
+    """DELETE /employees/{employee_id} — admin: remove a Cognito user and DynamoDB record."""
+    if not _is_admin(user_info):
+        return _cors_response(403, {"error": "Admin access required."})
+
+    if not USER_POOL_ID:
+        return _cors_response(500, {"error": "USER_POOL_ID not configured."})
+
+    path_params = event.get("pathParameters") or {}
+    target_id = path_params.get("employee_id", "").strip()
+
+    if not target_id:
+        return _cors_response(400, {"error": "employee_id path parameter is required."})
+
+    # Prevent admin from deleting themselves
+    if target_id == user_info["employee_id"]:
+        return _cors_response(400, {"error": "You cannot delete your own account."})
+
+    # Fetch the employee record first (to get their Cognito username / email)
+    resp = employees_table.get_item(Key={"employee_id": target_id})
+    employee = resp.get("Item")
+    if not employee:
+        return _cors_response(404, {"error": "Employee not found."})
+
+    cognito_username = employee.get("email", "")
+
+    # 1. Delete from Cognito
+    if cognito_username:
+        try:
+            cognito_client.admin_delete_user(
+                UserPoolId=USER_POOL_ID,
+                Username=cognito_username,
+            )
+        except cognito_client.exceptions.UserNotFoundException:
+            pass  # already gone from Cognito, continue
+        except Exception as e:
+            print(f"Cognito delete_user error: {e}")
+            return _cors_response(500, {"error": "Failed to delete user from Cognito."})
+
+    # 2. Delete DynamoDB employee record
+    try:
+        employees_table.delete_item(Key={"employee_id": target_id})
+    except Exception as e:
+        print(f"DynamoDB delete employee error: {e}")
+        return _cors_response(500, {"error": "Cognito user deleted but failed to remove employee record."})
+
+    return _cors_response(200, {
+        "message": f"Employee '{employee.get('name', target_id)}' deleted successfully.",
+        "employee_id": target_id,
+    })
+
 
 # ---------------------------------------------------------------------------
 # Lambda entry point
@@ -367,6 +418,7 @@ ROUTES = {
     ("GET", "/attendance/all"): handle_attendance_all,
     ("GET", "/employees"): handle_employees,
     ("POST", "/employees"): handle_create_employee,
+    ("DELETE", "/employees/{employee_id}"): handle_delete_employee,
 }
 
 

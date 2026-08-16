@@ -53,6 +53,42 @@
       </div>
     </div>
 
+    <!-- Manage Employees -->
+    <div class="card scale-in" style="animation-delay: 0.12s;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+        <h2 class="section-title" style="margin-bottom:0;">
+          <span class="icon">👥</span> Manage Employees
+        </h2>
+        <button id="btn-add-employee-2" class="btn btn-primary btn-sm">➕ Add Employee</button>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="employees-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Role</th>
+              <th>Joined</th>
+              <th style="text-align:center;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="employees-tbody">
+            <tr>
+              <td colspan="4" style="text-align:center; padding:2rem;">
+                <span class="spinner"></span>
+                <p style="margin-top:0.5rem; color:var(--text-muted);">Loading employees...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="employees-empty" class="empty-state" style="display:none;">
+        <div class="icon">🧑‍💼</div>
+        <p>No employees found. Add one to get started.</p>
+      </div>
+    </div>
+
     <!-- Attendance Table -->
     <div class="card scale-in" style="animation-delay: 0.15s;">
       <h2 class="section-title">
@@ -193,6 +229,29 @@
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/admin.js"></script>
+
+  <!-- ================================================================
+       Delete Confirmation Modal
+       ================================================================ -->
+  <div id="delete-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" style="display:none;">
+    <div class="modal-card scale-in" style="max-width:400px;">
+      <div style="text-align:center; padding: 0.5rem 0 1.5rem;">
+        <div style="font-size:3rem; margin-bottom:1rem;">🗑️</div>
+        <h2 id="delete-modal-title" style="font-size:1.2rem; margin-bottom:0.5rem; color:var(--text-primary);">Delete Employee?</h2>
+        <p id="delete-modal-desc" style="color:var(--text-muted); font-size:0.9rem; line-height:1.5;"></p>
+      </div>
+
+      <div id="delete-modal-alert" class="alert" style="margin-bottom:1rem;"></div>
+
+      <div style="display:flex; gap:0.75rem;">
+        <button id="btn-delete-cancel" class="btn btn-outline" style="flex:1;">Cancel</button>
+        <button id="btn-delete-confirm" class="btn btn-danger" style="flex:1;">
+          <span id="btn-delete-label">Delete</span>
+          <span id="btn-delete-spinner" class="spinner" style="display:none; width:16px; height:16px;"></span>
+        </button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
