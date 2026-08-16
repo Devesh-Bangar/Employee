@@ -14,6 +14,7 @@ Globals:
       Variables:
         EMPLOYEES_TABLE: !Ref EmployeesTable
         ATTENDANCE_TABLE: !Ref AttendanceTable
+        USER_POOL_ID: !Ref UserPool
 
   Api:
     Cors:
@@ -147,6 +148,15 @@ Resources:
             TableName: !Ref EmployeesTable
         - DynamoDBCrudPolicy:
             TableName: !Ref AttendanceTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDeleteUser
+                - cognito-idp:AdminGetUser
+                - cognito-idp:ListUsers
+              Resource: !GetAtt UserPool.Arn
       Events:
         CheckIn:
           Type: Api
@@ -184,6 +194,12 @@ Resources:
             RestApiId: !Ref AttendanceApi
             Path: /employees
             Method: get
+        CreateEmployee:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AttendanceApi
+            Path: /employees
+            Method: post
 
   # -------------------------------------------------------------------------
   # S3 Bucket for Frontend

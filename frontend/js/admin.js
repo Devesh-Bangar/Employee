@@ -182,3 +182,140 @@ function _getTodayIST() {
   const istTime = new Date(utc + istOffset * 60000);
   return istTime.toISOString().split("T")[0];
 }
+
+// ---------------------------------------------------------------------------
+// Add Employee Modal
+// ---------------------------------------------------------------------------
+
+function openModal() {
+  const overlay = document.getElementById("modal-overlay");
+  const form = document.getElementById("add-employee-form");
+  const successEl = document.getElementById("modal-success");
+  const modalAlert = document.getElementById("modal-alert");
+
+  // Reset form state
+  form.reset();
+  document.getElementById("new-temp-password").value = "TempPass@123";
+  form.style.display = "block";
+  successEl.style.display = "none";
+  modalAlert.className = "alert";
+
+  overlay.style.display = "flex";
+  document.body.style.overflow = "hidden";
+
+  // Animate the card
+  const card = overlay.querySelector(".modal-card");
+  card.classList.remove("scale-in");
+  void card.offsetWidth;
+  card.classList.add("scale-in");
+
+  setTimeout(() => document.getElementById("new-name").focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById("modal-overlay").style.display = "none";
+  document.body.style.overflow = "";
+}
+
+function showModalAlert(type, message) {
+  const alertEl = document.getElementById("modal-alert");
+  alertEl.className = `alert alert-${type} show`;
+  alertEl.textContent = message;
+}
+
+function setCreateButtonLoading(loading) {
+  const btn = document.getElementById("btn-create-employee");
+  const label = document.getElementById("btn-create-label");
+  const spinner = document.getElementById("btn-create-spinner");
+
+  btn.disabled = loading;
+  label.style.display = loading ? "none" : "inline";
+  spinner.style.display = loading ? "inline-block" : "none";
+}
+
+async function handleCreateEmployee(e) {
+  e.preventDefault();
+
+  const name = document.getElementById("new-name").value.trim();
+  const email = document.getElementById("new-email").value.trim().toLowerCase();
+  const role = document.getElementById("new-role").value;
+  const tempPassword = document.getElementById("new-temp-password").value.trim() || "TempPass@123";
+
+  // Client-side validation
+  if (!name) {
+    showModalAlert("error", "Full name is required.");
+    document.getElementById("new-name").focus();
+    return;
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showModalAlert("error", "Please enter a valid email address.");
+    document.getElementById("new-email").focus();
+    return;
+  }
+
+  setCreateButtonLoading(true);
+  document.getElementById("modal-alert").className = "alert"; // hide prev alert
+
+  try {
+    const result = await apiPost("/employees", {
+      name,
+      email,
+      role,
+      temp_password: tempPassword,
+    });
+
+    // Show success state
+    document.getElementById("add-employee-form").style.display = "none";
+    document.getElementById("modal-alert").className = "alert";
+
+    document.getElementById("success-name").textContent = `${result.name} (${result.role})`;
+    document.getElementById("success-email").textContent = result.email;
+    document.getElementById("success-pass").textContent = result.temp_password;
+    document.getElementById("modal-success").style.display = "block";
+
+    // Refresh the attendance table so new employee appears
+    loadAttendance();
+
+  } catch (err) {
+    showModalAlert("error", err.message || "Failed to create employee. Please try again.");
+  } finally {
+    setCreateButtonLoading(false);
+  }
+}
+
+// Wire up modal events after DOM ready (appended to existing DOMContentLoaded handler)
+document.addEventListener("DOMContentLoaded", () => {
+  const btnOpen   = document.getElementById("btn-add-employee");
+  const btnClose  = document.getElementById("btn-modal-close");
+  const btnCancel = document.getElementById("btn-modal-cancel");
+  const btnAnother = document.getElementById("btn-add-another");
+  const overlay   = document.getElementById("modal-overlay");
+  const form      = document.getElementById("add-employee-form");
+
+  if (btnOpen)    btnOpen.addEventListener("click", openModal);
+  if (btnClose)   btnClose.addEventListener("click", closeModal);
+  if (btnCancel)  btnCancel.addEventListener("click", closeModal);
+  if (btnAnother) btnAnother.addEventListener("click", () => {
+    document.getElementById("modal-success").style.display = "none";
+    document.getElementById("add-employee-form").style.display = "block";
+    document.getElementById("add-employee-form").reset();
+    document.getElementById("new-temp-password").value = "TempPass@123";
+    setTimeout(() => document.getElementById("new-name").focus(), 50);
+  });
+
+  // Close on backdrop click
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeModal();
+    });
+  }
+
+  // Close on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay && overlay.style.display !== "none") {
+      closeModal();
+    }
+  });
+
+  if (form) form.addEventListener("submit", handleCreateEmployee);
+});

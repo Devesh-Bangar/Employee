@@ -10,11 +10,13 @@ from boto3.dynamodb.conditions import Key
 # ---------------------------------------------------------------------------
 EMPLOYEES_TABLE = os.environ.get("EMPLOYEES_TABLE", "Employees")
 ATTENDANCE_TABLE = os.environ.get("ATTENDANCE_TABLE", "Attendance")
+USER_POOL_ID = os.environ.get("USER_POOL_ID", "")
 IST = pytz.timezone("Asia/Kolkata")
 
 dynamodb = boto3.resource("dynamodb")
 employees_table = dynamodb.Table(EMPLOYEES_TABLE)
 attendance_table = dynamodb.Table(ATTENDANCE_TABLE)
+cognito_client = boto3.client("cognito-idp")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -261,6 +263,97 @@ def handle_employees(event, user_info):
     return _cors_response(200, {"employees": employees})
 
 
+def handle_create_employee(event, user_info):
+    """POST /employees — admin: create a new Cognito user and employee record."""
+    if not _is_admin(user_info):
+        return _cors_response(403, {"error": "Admin access required."})
+
+    if not USER_POOL_ID:
+        return _cors_response(500, {"error": "USER_POOL_ID not configured."})
+
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return _cors_response(400, {"error": "Invalid JSON body."})
+
+    name = (body.get("name") or "").strip()
+    email = (body.get("email") or "").strip().lower()
+    role = body.get("role", "employee").strip().lower()
+    temp_password = body.get("temp_password", "TempPass@123").strip()
+
+    if not name or not email:
+        return _cors_response(400, {"error": "name and email are required."})
+
+    if role not in ("admin", "employee"):
+        return _cors_response(400, {"error": "role must be 'admin' or 'employee'."})
+
+    # 1. Create the Cognito user
+    try:
+        cognito_resp = cognito_client.admin_create_user(
+            UserPoolId=USER_POOL_ID,
+            Username=email,
+            UserAttributes=[
+                {"Name": "email", "Value": email},
+                {"Name": "name", "Value": name},
+                {"Name": "email_verified", "Value": "true"},
+            ],
+            TemporaryPassword=temp_password,
+            MessageAction="SUPPRESS",  # don't send a Cognito welcome email
+        )
+    except cognito_client.exceptions.UsernameExistsException:
+        return _cors_response(409, {"error": f"A user with email '{email}' already exists."})
+    except cognito_client.exceptions.InvalidPasswordException as e:
+        return _cors_response(400, {"error": f"Invalid temporary password: {str(e)}"})
+    except Exception as e:
+        print(f"Cognito create_user error: {e}")
+        return _cors_response(500, {"error": "Failed to create Cognito user."})
+
+    # Extract the new user's sub (UUID)
+    user_attrs = cognito_resp["User"]["Attributes"]
+    user_sub = next((a["Value"] for a in user_attrs if a["Name"] == "sub"), None)
+    if not user_sub:
+        return _cors_response(500, {"error": "Could not retrieve user sub from Cognito."})
+
+    # 2. Add to the correct Cognito group
+    try:
+        cognito_client.admin_add_user_to_group(
+            UserPoolId=USER_POOL_ID,
+            Username=email,
+            GroupName=role,
+        )
+    except Exception as e:
+        print(f"Cognito add_to_group error: {e}")
+        # Non-fatal — continue
+
+    # 3. Create the DynamoDB employee record
+    now = _now_ist()
+    try:
+        employees_table.put_item(
+            Item={
+                "employee_id": user_sub,
+                "name": name,
+                "email": email,
+                "role": role,
+                "created_at": now.isoformat(),
+            },
+            ConditionExpression="attribute_not_exists(employee_id)",
+        )
+    except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
+        pass  # record already exists (post-confirmation trigger beat us)
+    except Exception as e:
+        print(f"DynamoDB put_item error: {e}")
+        return _cors_response(500, {"error": "User created in Cognito but failed to save employee record."})
+
+    return _cors_response(201, {
+        "message": f"Employee '{name}' created successfully.",
+        "employee_id": user_sub,
+        "name": name,
+        "email": email,
+        "role": role,
+        "temp_password": temp_password,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Lambda entry point
 # ---------------------------------------------------------------------------
@@ -273,6 +366,7 @@ ROUTES = {
     ("GET", "/attendance/today"): handle_attendance_today,
     ("GET", "/attendance/all"): handle_attendance_all,
     ("GET", "/employees"): handle_employees,
+    ("POST", "/employees"): handle_create_employee,
 }
 
 
